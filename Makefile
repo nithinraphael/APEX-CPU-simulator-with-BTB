@@ -19,4 +19,11 @@ run: $(TARGET)
 	./$(TARGET) $(INPUT)
 
 clean:
-	rm -rf $(BUILD_DIR)
+	rm -rf $(TARGET)
+
+clean_build_run: clean all run
+
+# alias
+cbr: clean_build_run
+
+.PHONY: all run clean clean_build_run cbr
