@@ -28,4 +28,18 @@ inline string replaceCommasWithSpaces(const string& str)
     return newStr;
 }
 
+inline vector<string> splitString(const string& input, char splitter)
+{
+    vector<string> words;
+    istringstream strStream(input);
+    string str;
+
+    while (getline(strStream, str, splitter))
+    {
+        words.push_back(str);
+    }
+
+    return words;
+}
+
 } // namespace utils
