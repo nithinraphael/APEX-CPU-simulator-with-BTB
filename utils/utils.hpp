@@ -42,4 +42,17 @@ inline vector<string> splitString(const string& input, char splitter)
     return words;
 }
 
+inline string replaceSpacesWith(const string& input, const string& with)
+{
+    regex pattern("\\s+");
+
+    return regex_replace(input, pattern, with);
+}
+
+inline string replaceCommasWith(const string& input, const string& with)
+{
+    regex pattern(",+");
+    return regex_replace(input, pattern, with);
+}
+
 } // namespace utils
