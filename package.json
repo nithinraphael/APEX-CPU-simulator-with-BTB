@@ -1,0 +1,28 @@
+{
+  "name": "apex-sim",
+  "version": "0.0.2",
+  "description": "a collection of services and ui components to create products",
+  "main": "index.js",
+  "scripts": {
+    "release": "standard-version",
+    "commit": "git cz"
+  },
+  "repository": {
+    "type": "git"
+  },
+  "author": "Nithin Stephen Raphael",
+  "license": "ISC",
+  "devDependencies": {
+    "@commitlint/cli": "^17.6.3",
+    "@commitlint/config-conventional": "^17.6.3",
+    "cz-conventional-changelog": "^3.3.0",
+    "husky": "^8.0.3",
+    "standard-version": "^9.3.0"
+  },
+  "config": {
+    "commitizen": {
+      "path": "./node_modules/cz-conventional-changelog"
+    }
+  },
+  "dependencies": {}
+}
