@@ -14,7 +14,7 @@ using namespace utils;
 namespace instruction
 {
 
-struct Instruction
+struct InstructionStr
 {
     string opcode;
     optional<string> operand1;
@@ -22,7 +22,7 @@ struct Instruction
     optional<string> operand3;
 };
 
-inline Result<Instruction, Error> parseInstruction(const string& instruction)
+inline Result<InstructionStr, Error> parseInstructionStr(const string& instruction)
 {
     string replacedStr = replaceCommasWith(replaceSpacesWith(instruction, ","), ",");
 
@@ -30,26 +30,26 @@ inline Result<Instruction, Error> parseInstruction(const string& instruction)
 
     if (instructionVec.empty() || instructionVec.size() > 4)
     {
-        return Result<Instruction, Error>(Error("invalid instruction"));
+        return Result<InstructionStr, Error>(Error("invalid instruction"));
     }
 
     if (instructionVec.size() == 4)
     {
-        return Result<Instruction, Error>(
-            Instruction{instructionVec[0], instructionVec[1], instructionVec[2], instructionVec[3]});
+        return Result<InstructionStr, Error>(
+            InstructionStr{instructionVec[0], instructionVec[1], instructionVec[2], instructionVec[3]});
     }
 
     if (instructionVec.size() == 3)
     {
-        return Result<Instruction, Error>(Instruction{instructionVec[0], instructionVec[1], instructionVec[2]});
+        return Result<InstructionStr, Error>(InstructionStr{instructionVec[0], instructionVec[1], instructionVec[2]});
     }
 
     if (instructionVec.size() == 2)
     {
-        return Result<Instruction, Error>(Instruction{instructionVec[0], instructionVec[1]});
+        return Result<InstructionStr, Error>(InstructionStr{instructionVec[0], instructionVec[1]});
     }
 
-    return Result<Instruction, Error>(Instruction{instructionVec[0]});
+    return Result<InstructionStr, Error>(InstructionStr{instructionVec[0]});
 }
 
 } // namespace instruction
