@@ -7,6 +7,11 @@
 
 using namespace std;
 
+// This class is used as an hack than to return void
+class NoError
+{
+};
+
 namespace errors
 {
 
