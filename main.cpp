@@ -75,6 +75,9 @@ struct ExResult
     Instruction inst;
     optional<RegisterInfo> regInfo = nullopt;
     optional<MemoryInfo> memoryInfo = nullopt;
+    // BAD BAD CODE
+    optional<RegisterInfo> regInfo2 = nullopt;
+    optional<MemoryInfo> memoryInfo2 = nullopt;
 };
 
 template <typename T> std::queue<T> copyQueue(const std::queue<T>& original)
@@ -129,7 +132,8 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
         {
             return false;
         }
-        else if (second.opcode == config::Opcode::STORE || second.opcode == config::Opcode::ADDL)
+        else if (second.opcode == config::Opcode::STORE || second.opcode == config::Opcode::ADDL ||
+                 second.opcode == config::Opcode::STOREP)
         {
 
             if (first.operand1.value() == second.operand1.value() || first.operand1.value() == second.operand2.value())
@@ -171,6 +175,18 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
         if (second.opcode == config::Opcode::SUB)
         {
             if (first.operand1.value() == second.operand2.value() || first.operand1.value() == second.operand3.value())
+            {
+                return true;
+            }
+        }
+    }
+    else if (first.opcode == config::Opcode::STOREP)
+    {
+        if (second.opcode == config::Opcode::LOADP)
+        {
+            if (first.operand1.value() == second.operand2.value() ||
+                first.operand1.value() == second.operand2.value() ||
+                first.operand2.value() == second.operand2.value() || first.operand2.value() == second.operand2.value())
             {
                 return true;
             }
@@ -442,6 +458,24 @@ int main(int argc, char* argv[])
 
                 exQueue.push(ExResult{true, ins, nullopt, MemoryInfo{memoryAddress, value}});
             }
+            else if (ins.opcode == config::Opcode::STOREP)
+            {
+
+                auto rsrc1 = regFile.getRegFromString(ins.operand1.value());
+                auto rsrc2 = regFile.getRegFromString(ins.operand2.value());
+                auto literal = getNumberFromLiteral(ins.operand3.value()).getValue();
+
+                int memoryAddress = rsrc2.value()->get() + literal;
+
+                int value = rsrc1.value()->get();
+
+                exQueue.push(ExResult{
+                    true,
+                    ins,
+                    RegisterInfo{ins.operand2.value(), rsrc2.value()->get() + 4},
+                    MemoryInfo{memoryAddress, value},
+                });
+            }
             else if (ins.opcode == config::Opcode::ADDL)
             {
 
@@ -477,6 +511,19 @@ int main(int argc, char* argv[])
 
                 exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result.getValue()}, nullopt});
             }
+            else if (ins.opcode == config::Opcode::LOADP)
+            {
+
+                auto rDest = regFile.getRegFromString(ins.operand1.value());
+                auto rsrc1 = regFile.getRegFromString(ins.operand2.value());
+                auto literal = getNumberFromLiteral(ins.operand3.value()).getValue();
+
+                Result<uint8_t, Error> result =
+                    memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
+
+                exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result.getValue()}, nullopt,
+                                      RegisterInfo{ins.operand2.value(), rsrc1.value()->get() + 4}});
+            }
             else if (ins.opcode == config::Opcode::JALR)
             {
                 resetQueue(fetchQueue);
@@ -489,8 +536,6 @@ int main(int argc, char* argv[])
                 auto literal = getNumberFromLiteral(ins.operand3.value()).getValue();
 
                 auto value = rsrc1.value()->get() + literal;
-
-                cout << "JALRRRRR " << value << endl;
 
                 // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
                 exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), (pc - 2)}, nullopt});
@@ -509,7 +554,6 @@ int main(int argc, char* argv[])
                 auto value = rsrc1.value()->get() + literal;
 
                 pc = value;
-                cout << "JUMPP " << value << endl;
 
                 exQueue.push(ExResult{false, ins});
             }
@@ -522,6 +566,20 @@ int main(int argc, char* argv[])
         {
 
             auto ins = exQueue.front();
+
+            if (ins.hasUpdate)
+            {
+                if (ins.memoryInfo.has_value())
+                {
+                    cout << "88888888888" << ins.memoryInfo->source << ins.memoryInfo->value << endl;
+                    memory.write(ins.memoryInfo->source, ins.memoryInfo->value);
+                }
+                if (ins.memoryInfo2.has_value())
+                {
+                    cout << "88888888888" << ins.memoryInfo2->source << ins.memoryInfo2->value << endl;
+                    memory.write(ins.memoryInfo2->source, ins.memoryInfo2->value);
+                }
+            }
             memQueue.push(ins);
             exQueue.pop();
             cout << "Memory: " << getInstructionString(ins.inst) << endl;
@@ -533,14 +591,14 @@ int main(int argc, char* argv[])
             auto ins = memQueue.front();
             if (ins.hasUpdate)
             {
-                if (ins.memoryInfo.has_value())
-                {
-                    cout << "88888888888" << ins.memoryInfo->source << ins.memoryInfo->value << endl;
-                    memory.write(ins.memoryInfo->source, ins.memoryInfo->value);
-                }
-                else if (ins.regInfo.has_value())
+                if (ins.regInfo.has_value())
                 {
                     regFile.setRegFromString(ins.regInfo->source, ins.regInfo->value);
+                }
+
+                if (ins.regInfo2.has_value())
+                {
+                    regFile.setRegFromString(ins.regInfo2->source, ins.regInfo2->value);
                 }
             }
             memQueue.pop();

@@ -52,7 +52,7 @@ class CPU
     static const int DEFAULT_REGISTER_VALUE = 0;
     // 32 bit register -> 4 Byte
     static const int REGISTER_SIZE_BITS = 32;
-    static const int TOTAL_REGISTERS = 16;
+    static const int TOTAL_REGISTERS = 32;
     static const int TOTAL_MEMORY = 0xFFFFFFFF; // 4 Gigs
     static const int PROGRAM_COUNTER_START_ADDRESS = 4000;
 };
