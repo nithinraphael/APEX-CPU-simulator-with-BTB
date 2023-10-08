@@ -137,6 +137,14 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
                 return true;
             }
         }
+        else if (second.opcode == config::Opcode::JALR)
+        {
+            // see operand 2
+            if (first.operand1.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
 
         return false;
     }
@@ -315,7 +323,7 @@ int main(int argc, char* argv[])
                 fakeFetchQueue.push(inst);
                 bool mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
 
-                cout << "FETCH STALL:  " << mustStall << endl;
+                // cout << "FETCH STALL:  " << mustStall << endl;
                 if (!mustStall)
                 {
                     fetchQueue.push(inst);
@@ -333,7 +341,7 @@ int main(int argc, char* argv[])
         if (cycle > 0 && !fetchQueue.empty())
         {
             stall = shouldStall(fetchQueue, dRFQueue, exQueue);
-            cout << "DECODE STALL:  " << stall << endl;
+            // cout << "DECODE STALL:  " << stall << endl;
 
             auto insDRF = fetchQueue.front();
             if (!stall)
@@ -341,6 +349,8 @@ int main(int argc, char* argv[])
                 if (insDRF.opcode == config::Opcode::HALT)
                 {
                     stopFetch = true;
+                    // resetQueue(dRFQueue);
+                    // resetQueue(fetchQueue);
                 }
                 dRFQueue.push(insDRF);
                 cout << "Decode/RF: " << getInstructionString(insDRF) << endl;
@@ -466,6 +476,42 @@ int main(int argc, char* argv[])
                     memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
 
                 exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result.getValue()}, nullopt});
+            }
+            else if (ins.opcode == config::Opcode::JALR)
+            {
+                resetQueue(fetchQueue);
+                resetQueue(dRFQueue);
+                auto inst = Instruction{config::Opcode::NOP};
+                dRFQueue.push(inst);
+                fetchQueue.push(inst);
+
+                auto rsrc1 = regFile.getRegFromString(ins.operand2.value());
+                auto literal = getNumberFromLiteral(ins.operand3.value()).getValue();
+
+                auto value = rsrc1.value()->get() + literal;
+
+                cout << "JALRRRRR " << value << endl;
+
+                // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
+                exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), (pc - 2)}, nullopt});
+            }
+            else if (ins.opcode == config::Opcode::JUMP)
+            {
+                resetQueue(fetchQueue);
+                resetQueue(dRFQueue);
+                auto inst = Instruction{config::Opcode::NOP};
+                dRFQueue.push(inst);
+                fetchQueue.push(inst);
+
+                auto rsrc1 = regFile.getRegFromString(ins.operand1.value());
+                auto literal = getNumberFromLiteral(ins.operand2.value()).getValue();
+
+                auto value = rsrc1.value()->get() + literal;
+
+                pc = value;
+                cout << "JUMPP " << value << endl;
+
+                exQueue.push(ExResult{false, ins});
             }
 
             cout << "Execute: " << getInstructionString(ins) << endl;
