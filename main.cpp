@@ -77,6 +77,12 @@ struct ExResult
     optional<MemoryInfo> memoryInfo = nullopt;
 };
 
+template <typename T> std::queue<T> copyQueue(const std::queue<T>& original)
+{
+    std::queue<T> copiedQueue = original; // Create a copy using the copy constructor
+    return copiedQueue;
+}
+
 // int pc = 0;
 // int cycle = 0;
 // bool stopFetch = false;
@@ -139,6 +145,24 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
         if (second.opcode == config::Opcode::CMP)
         {
             if (first.operand1.value() == second.operand1.value() || first.operand1.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
+
+        if (second.opcode == config::Opcode::ADD)
+        {
+            if (first.operand1.value() == second.operand2.value() || first.operand1.value() == second.operand3.value())
+            {
+                return true;
+            }
+        }
+    }
+    else if (first.opcode == config::Opcode::ADDL)
+    {
+        if (second.opcode == config::Opcode::SUB)
+        {
+            if (first.operand1.value() == second.operand2.value() || first.operand1.value() == second.operand3.value())
             {
                 return true;
             }
@@ -284,13 +308,24 @@ int main(int argc, char* argv[])
         // FETCH
         if (!stopFetch)
         {
-            if (pc < instructionSq.size() && stall == false)
+            if (pc < instructionSq.size())
             {
-
                 auto inst = instructionSq[pc];
-                fetchQueue.push(inst);
-                cout << "Fetch: " << getInstructionString(inst) << endl;
-                pc++;
+                auto fakeFetchQueue = copyQueue(fetchQueue);
+                fakeFetchQueue.push(inst);
+                bool mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
+
+                cout << "FETCH STALL:  " << mustStall << endl;
+                if (!mustStall)
+                {
+                    fetchQueue.push(inst);
+                    pc++;
+                    cout << "Fetch: " << getInstructionString(inst) << endl;
+                }
+                else
+                {
+                    cout << "Fetch: " << getInstructionString(inst) << endl;
+                }
             }
         }
 
@@ -298,6 +333,8 @@ int main(int argc, char* argv[])
         if (cycle > 0 && !fetchQueue.empty())
         {
             stall = shouldStall(fetchQueue, dRFQueue, exQueue);
+            cout << "DECODE STALL:  " << stall << endl;
+
             auto insDRF = fetchQueue.front();
             if (!stall)
             {
@@ -323,7 +360,7 @@ int main(int argc, char* argv[])
             auto ins = dRFQueue.front();
             dRFQueue.pop();
 
-            if (ins.opcode == config::Opcode::NOP)
+            if (ins.opcode == config::Opcode::NOP || ins.opcode == config::Opcode::HALT)
             {
                 exQueue.push(ExResult{false, ins});
             }
@@ -354,17 +391,18 @@ int main(int argc, char* argv[])
                 {
                     Z = 1;
                 }
+                cout << "444444444444" << endl;
 
                 exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result}});
             }
-            else if (ins.opcode == config::Opcode::ADD)
+            else if (ins.opcode == config::Opcode::SUB)
             {
 
                 auto regDest = regFile.getRegFromString(ins.operand1.value());
                 auto regSrc1 = regFile.getRegFromString(ins.operand2.value());
                 auto regSrc2 = regFile.getRegFromString(ins.operand3.value());
 
-                int result = regSrc1.value()->get() + regSrc2.value()->get();
+                int result = regSrc1.value()->get() - regSrc2.value()->get();
 
                 if (result > 0)
                 {
