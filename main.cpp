@@ -179,6 +179,14 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
                 return true;
             }
         }
+
+        if (second.opcode == config::Opcode::LOADP)
+        {
+            if (first.operand1.value() == second.operand1.value() || first.operand1.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
     }
     else if (first.opcode == config::Opcode::STOREP)
     {
@@ -187,6 +195,48 @@ bool shouldStallHelper(const Instruction& first, const Instruction& second)
             if (first.operand1.value() == second.operand2.value() ||
                 first.operand1.value() == second.operand2.value() ||
                 first.operand2.value() == second.operand2.value() || first.operand2.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
+
+        if (second.opcode == config::Opcode::ADDL)
+        {
+
+            if (first.operand1.value() == second.operand2.value() || first.operand2.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
+    }
+    else if (first.opcode == config::Opcode::LOADP)
+    {
+        if (second.opcode == config::Opcode::XOR)
+        {
+            if (first.operand1.value() == second.operand2.value() ||
+                first.operand1.value() == second.operand2.value() ||
+                first.operand2.value() == second.operand2.value() || first.operand2.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
+
+        if (second.opcode == config::Opcode::STOREP)
+        {
+            if (first.operand1.value() == second.operand2.value() ||
+                first.operand1.value() == second.operand2.value() ||
+                first.operand2.value() == second.operand2.value() || first.operand2.value() == second.operand2.value())
+            {
+                return true;
+            }
+        }
+    }
+    else if (first.opcode == config::Opcode::XOR)
+    {
+        if (second.opcode == config::Opcode::STOREP)
+        {
+            cout << "***************" << endl;
+            if (first.operand1.value() == second.operand1.value() || first.operand1.value() == second.operand2.value())
             {
                 return true;
             }
@@ -332,7 +382,8 @@ int main(int argc, char* argv[])
         // FETCH
         if (!stopFetch)
         {
-            cout << pc << "ssssssss  " << endl;
+
+            cout << "++++++++++++++++++" << endl;
             if (pc < instructionSq.size())
             {
                 auto inst = instructionSq[pc];
@@ -512,6 +563,62 @@ int main(int argc, char* argv[])
 
                 exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result}, nullopt});
             }
+            else if (ins.opcode == config::Opcode::SUBL)
+            {
+
+                auto regSrc1 = regFile.getRegFromString(ins.operand2.value());
+                auto num = getNumberFromLiteral(ins.operand3.value()).getValue();
+
+                int result = regSrc1.value()->get() - num;
+
+                P = 0;
+                N = 0;
+                Z = 0;
+
+                if (result > 0)
+                {
+                    P = 1;
+                }
+                else if (result < 0)
+                {
+                    N = 1;
+                }
+                else if (result == 0)
+                {
+                    Z = 1;
+                }
+
+                exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result}, nullopt});
+            }
+            else if (ins.opcode == config::Opcode::XOR)
+            {
+
+                auto regSrc1 = regFile.getRegFromString(ins.operand2.value());
+                auto regSrc2 = regFile.getRegFromString(ins.operand3.value());
+
+                auto num = getNumberFromLiteral(ins.operand3.value()).getValue();
+
+                int result = regSrc1.value()->get() ^ regSrc2.value()->get();
+
+                P = 0;
+                N = 0;
+                Z = 0;
+
+                if (result > 0)
+                {
+                    P = 1;
+                }
+                else if (result < 0)
+                {
+                    N = 1;
+                }
+                else if (result == 0)
+                {
+                    Z = 1;
+                }
+
+                exQueue.push(ExResult{true, ins, RegisterInfo{ins.operand1.value(), result}, nullopt});
+            }
             else if (ins.opcode == config::Opcode::LOAD)
             {
 
@@ -639,6 +746,30 @@ int main(int argc, char* argv[])
                     cout << "nu,, " << num << "--- pc" << pc << endl;
                     pc = (pc + num) - 2 - 1;
                     cout << "nu,, " << num << "--- pc" << pc << endl;
+                }
+
+                exQueue.push(ExResult{false, ins});
+            }
+            else if (ins.opcode == config::Opcode::BP)
+            {
+
+                if (P == 1)
+                {
+
+                    auto num = getNumberFromLiteral(ins.operand1.value()).getValue();
+                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                    num = getRelativeNumber(num);
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = Instruction{config::Opcode::NOP};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+                    pc = (pc + num) - 2;
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+
+                    stopFetch = false;
                 }
 
                 exQueue.push(ExResult{false, ins});

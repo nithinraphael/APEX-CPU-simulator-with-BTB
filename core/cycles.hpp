@@ -95,7 +95,7 @@ inline Result<NoError, Error> fetch(Instruction inst)
 
     if (opcode == config::Opcode::XOR)
     {
-        cout << "XOR" << endl;
+        cout << "EX-OR" << endl;
         return Result<NoError, Error>(NoError());
     }
 

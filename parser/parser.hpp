@@ -76,7 +76,7 @@ inline Result<config::Opcode, Error> parseOpcode(const string& instruction)
         return Result<config::Opcode, Error>(config::Opcode::OR);
     }
 
-    if (instModified == "XOR")
+    if (instModified == "EX-OR")
     {
         return Result<config::Opcode, Error>(config::Opcode::XOR);
     }
@@ -270,7 +270,7 @@ inline Result<NoError, Error> printOpcode(config::Opcode opcode, bool newLine = 
 
     if (opcode == config::Opcode::XOR)
     {
-        cout << "XOR";
+        cout << "EX-OR";
         if (newLine)
         {
             cout << endl;
@@ -465,7 +465,7 @@ inline string getOpcodeStr(config::Opcode opcode)
 
     if (opcode == config::Opcode::XOR)
     {
-        return "XOR";
+        return "EX-OR";
     }
 
     if (opcode == config::Opcode::CML)
