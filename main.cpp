@@ -304,7 +304,7 @@ int main(int argc, char* argv[])
     bool stall = false;
 
     // while (stopFetch == false || !wbQueue.empty())
-    while (cycle != 30)
+    while (cycle != 40)
     {
         cout << "\n---------- Cycle " << cycle + 1 << " ----------" << endl;
 
@@ -332,6 +332,7 @@ int main(int argc, char* argv[])
         // FETCH
         if (!stopFetch)
         {
+            cout << pc << "ssssssss  " << endl;
             if (pc < instructionSq.size())
             {
                 auto inst = instructionSq[pc];
@@ -405,6 +406,10 @@ int main(int argc, char* argv[])
 
                 int result = regSrc1.value()->get() + regSrc2.value()->get();
 
+                P = 0;
+                N = 0;
+                Z = 0;
+
                 if (result > 0)
                 {
                     P = 1;
@@ -429,6 +434,10 @@ int main(int argc, char* argv[])
                 auto regSrc2 = regFile.getRegFromString(ins.operand3.value());
 
                 int result = regSrc1.value()->get() - regSrc2.value()->get();
+
+                P = 0;
+                N = 0;
+                Z = 0;
 
                 if (result > 0)
                 {
@@ -483,6 +492,10 @@ int main(int argc, char* argv[])
                 auto num = getNumberFromLiteral(ins.operand3.value()).getValue();
 
                 int result = regSrc1.value()->get() + num;
+
+                P = 0;
+                N = 0;
+                Z = 0;
 
                 if (result > 0)
                 {
@@ -554,6 +567,79 @@ int main(int argc, char* argv[])
                 auto value = rsrc1.value()->get() + literal;
 
                 pc = value;
+
+                exQueue.push(ExResult{false, ins});
+            }
+            else if (ins.opcode == config::Opcode::CMP)
+            {
+                auto R1 = regFile.getRegFromString(ins.operand1.value());
+                auto R2 = regFile.getRegFromString(ins.operand2.value());
+
+                int result = R1.value()->get() - R2.value()->get();
+
+                P = 0;
+                N = 0;
+                Z = 0;
+
+                if (result > 0)
+                {
+                    P = 1;
+                }
+                else if (result < 0)
+                {
+                    N = 1;
+                }
+                else if (result == 0)
+                {
+                    Z = 1;
+                }
+
+                exQueue.push(ExResult{false, ins});
+            }
+            else if (ins.opcode == config::Opcode::BNZ)
+            {
+
+                if (Z == 0)
+                {
+                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                    auto num = getNumberFromLiteral(ins.operand1.value()).getValue();
+                    num = getRelativeNumber(num);
+
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = Instruction{config::Opcode::NOP};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    // printQueue(dRFQueue);
+                    // printQueue(exQueue);
+
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+                    pc = (pc + num) - 2 - 1;
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+                }
+
+                exQueue.push(ExResult{false, ins});
+            }
+            else if (ins.opcode == config::Opcode::BNP)
+            {
+
+                if (P == 0)
+                {
+
+                    auto num = getNumberFromLiteral(ins.operand1.value()).getValue();
+                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                    num = getRelativeNumber(num);
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = Instruction{config::Opcode::NOP};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+                    pc = (pc + num) - 2 - 1;
+                    cout << "nu,, " << num << "--- pc" << pc << endl;
+                }
 
                 exQueue.push(ExResult{false, ins});
             }
