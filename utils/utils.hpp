@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../config/index.hpp"
 #include "../errors/index.hpp"
 #include <__algorithm/remove_if.h>
 #include <algorithm>
@@ -70,8 +71,41 @@ inline string removeSpaces(const string& str)
 inline string toUpperCase(const string& s)
 {
     string str = s;
+
     transform(str.begin(), str.end(), str.begin(), ::toupper);
     return str;
+}
+
+inline Result<int, Error> getNumberFromLiteral(const string& s)
+{
+    string str = removeSpaces(s);
+
+    try
+    {
+        int num = stoi(str.substr(1));
+        return Result<int, Error>(num);
+    }
+    catch (const invalid_argument& e)
+    {
+        return Result<int, Error>(Error("Invalid Literal string"));
+    }
+}
+
+// Program Counter to Code Memory Index 4000 -> 0
+inline int pcToCodeMemoryIndex(int pc)
+{
+    return (pc - config::CPU::PROGRAM_COUNTER_START_ADDRESS) / 4;
+}
+
+inline int getRelativeNumber(int num)
+{
+    return num / 4;
+}
+
+// Code Memory Index to Program Counter 0 -> 4000
+inline int codeMemoryIndexToPC(int memoryIndex)
+{
+    return memoryIndex * 4 + config::CPU::PROGRAM_COUNTER_START_ADDRESS;
 }
 
 } // namespace utils

@@ -1,0 +1,8 @@
+https://stackoverflow.com/questions/22775500/is-there-any-raii-file-handle-already-implemented
+https://stackoverflow.com/questions/68396962/how-to-split-strings-in-c-like-in-python
+https://github.com/mortennobel/cpp-cheatsheet
+https://stackoverflow.com/questions/3141087/what-is-meant-with-const-at-end-of-function-declaration
+https://stackoverflow.com/questions/22746429/c-decimal-to-binary-converting
+https://stackoverflow.com/questions/19461478/convert-binary-bitset-to-hexadecimal-c
+https://stackoverflow.com/questions/83439/remove-spaces-from-stdstring-in-c
+https://medium.com/@caglayandokme/further-enhancing-the-singleton-pattern-in-c-8278b02b1ac7

@@ -3,6 +3,8 @@
 #include <memory>
 using namespace std;
 
+namespace core
+{
 class CPUClock
 {
   public:
@@ -32,3 +34,4 @@ class CPUClock
 
     uint32_t time;
 };
+} // namespace core

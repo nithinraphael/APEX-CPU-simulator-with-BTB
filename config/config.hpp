@@ -8,19 +8,32 @@ namespace config
 
 enum class Opcode : uint8_t
 {
-    ADD = 0x0,
-    SUB = 0x1,
-    MUL = 0x2,
-    DIV = 0x3,
-    AND = 0x4,
-    OR = 0x5,
-    XOR = 0x6,
-    MOVC = 0x7,
-    LOAD = 0x8,
-    STORE = 0x9,
-    BZ = 0xa,
-    BNZ = 0xb,
-    HALT = 0xc
+
+    ADD,
+    ADDL,
+    SUB,
+    SUBL,
+    MUL,
+    MOVC,
+    LOAD,
+    LOADP,
+    STORE,
+    STOREP,
+    AND,
+    OR,
+    XOR,
+    CML,
+    CMP,
+    BZ,
+    BNZ,
+    BP,
+    BNP,
+    BN,
+    BNN,
+    JUMP,
+    JALR,
+    NOP,
+    HALT
 };
 
 class Debugging
@@ -41,6 +54,7 @@ class CPU
     static const int REGISTER_SIZE_BITS = 32;
     static const int TOTAL_REGISTERS = 16;
     static const int TOTAL_MEMORY = 0xFFFFFFFF; // 4 Gigs
+    static const int PROGRAM_COUNTER_START_ADDRESS = 4000;
 };
 
 } // namespace config

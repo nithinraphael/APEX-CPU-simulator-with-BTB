@@ -23,7 +23,7 @@ class Error
   public:
     explicit Error(const string& errorMsg) : error(errorMsg){};
 
-    string getError() const
+    string toString() const
     {
         return error;
     }
@@ -32,6 +32,14 @@ class Error
     {
         cout << error << endl;
     }
+};
+
+template <typename V, typename E>
+concept ToString = requires(E e)
+{
+    {
+        e.toString()
+        } -> std::convertible_to<std::string>;
 };
 
 // IMPORTANT: You are not supposed to call `getError()` and `getValue()`
