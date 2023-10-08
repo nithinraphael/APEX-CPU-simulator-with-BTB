@@ -691,9 +691,13 @@ int main(int argc, char* argv[])
                 auto value = rsrc1.value()->get() + literal;
 
                 // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
-                exQueue.push(
-                    {inst.address, ExResult{true, ins.instruction,
-                                            RegisterInfo{ins.instruction.operand1.value(), (pc - 2)}, nullopt}});
+                cout << "PC  -2------- JALR  " << pc - 2 << "   " << ins.address << endl;
+                stopFetch = false;
+
+                exQueue.push({inst.address, ExResult{true, ins.instruction,
+                                                     RegisterInfo{ins.instruction.operand1.value(),
+                                                                  codeMemoryIndexToPC(ins.address + 1)},
+                                                     nullopt}});
             }
             else if (ins.instruction.opcode == config::Opcode::JUMP)
             {
@@ -708,7 +712,9 @@ int main(int argc, char* argv[])
 
                 auto value = rsrc1.value()->get() + literal;
 
-                pc = value;
+                cout << "VVVVVJHGHJ JKHJ ILK 0L  " << value << "  ooooooooooo" << endl;
+                pc = pcToCodeMemoryIndex(value);
+                cout << "VVVVVJHGHJ JKHJ ILK JL  " << pc << "  ooooooooooo" << endl;
 
                 exQueue.push({inst.address, ExResult{false, ins.instruction}});
             }
@@ -781,7 +787,7 @@ int main(int argc, char* argv[])
                     fetchQueue.push(inst);
 
                     cout << "nu,, " << num << "--- pc BNP" << pc << endl;
-                    pc = (pc + num) - 2 - 1;
+                    pc = (ins.address + num);
                     cout << "nu,, " << num << "--- pc" << pc << endl;
                 }
 
@@ -803,7 +809,7 @@ int main(int argc, char* argv[])
                     fetchQueue.push(inst);
 
                     cout << "nu,, " << num << "--- pc" << pc << endl;
-                    pc = (pc + num) - 2;
+                    pc = (ins.address + num);
                     cout << "nu,, " << num << "--- pc" << pc << endl;
 
                     stopFetch = false;
