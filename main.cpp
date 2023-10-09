@@ -30,7 +30,7 @@ using namespace instruction;
 using namespace errors;
 using namespace core;
 
-const bool IS_FORWARDING = true;
+const bool IS_FORWARDING = false;
 
 template <typename T> void resetQueue(std::queue<T>& q)
 {
@@ -349,31 +349,30 @@ bool shouldStallFETCH(Instruction second, queue<Instruction> dRFQueue)
 int main(int argc, char* argv[])
 {
 
-    if (argc != 4)
-    {
-        std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
-        return 1; // Exit with an error code
-    }
+    // if (argc != 4)
+    // {
+    //     std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
+    //     return 1;
+    // }
 
-    std::string inputFileName = argv[1];
-    if (std::string(argv[2]) != "simulate")
-    {
-        std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
-        return 1; // Exit with an error code
-    }
+    // std::string inputFileName = argv[1];
+    // if (std::string(argv[2]) != "simulate")
+    // {
+    //     std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
+    //     return 1;
+    // }
 
-    // Convert the command-line argument (string) to an integer
-    int numSimulations = 100; // Initialize to a default value
+    int numSimulations = 100;
 
-    try
-    {
-        numSimulations = std::stoi(removeSpaces(argv[3])); // Use std::stoi for string to int conversion
-    }
-    catch (const std::invalid_argument& e)
-    {
-        std::cerr << "Err argparse" << std::endl;
-        return 1; // Exit with an error code
-    }
+    // try
+    // {
+    //     numSimulations = std::stoi(removeSpaces(argv[3]));
+    // }
+    // catch (const std::invalid_argument& e)
+    // {
+    //     std::cerr << "Err argparse" << std::endl;
+    //     return 1;
+    // }
 
     Result<string, Error> filenameRes = getFileNameCMD(argc, argv);
     if (filenameRes.isError())
@@ -460,7 +459,10 @@ int main(int argc, char* argv[])
                 fakeFetchQueue.push(InstructionInfo{pc, inst});
                 bool mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
 
-                mustStall = false;
+                if (IS_FORWARDING)
+                {
+                    mustStall = false;
+                }
 
                 // cout << "FETCH STALL:  " << mustStall << endl;
                 if (!mustStall)
@@ -482,7 +484,10 @@ int main(int argc, char* argv[])
             stall = shouldStall(fetchQueue, dRFQueue, exQueue);
             // cout << "DECODE STALL:  " << stall << endl;
 
-            stall = false;
+            if (IS_FORWARDING)
+            {
+                stall = false;
+            }
 
             auto insDRF = fetchQueue.front();
             if (!stall)
@@ -506,396 +511,786 @@ int main(int argc, char* argv[])
         }
 
         // EXECUTE
-        if (cycle > 1 && !dRFQueue.empty())
+        if (IS_FORWARDING)
         {
-            auto ins = dRFQueue.front();
-            dRFQueue.pop();
-
-            if (ins.instruction.opcode == config::Opcode::NOP || ins.instruction.opcode == config::Opcode::HALT)
+            if (cycle > 1 && !dRFQueue.empty())
             {
-                exQueue.push({ins.address, ExResult{false, ins.instruction}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::MOVC)
-            {
-                auto reg = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto val = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
-                exQueue.push({ins.address,
-                              ExResult{true, ins.instruction, RegisterInfo{ins.instruction.operand1.value(), val}}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::ADD)
-            {
+                auto ins = dRFQueue.front();
+                dRFQueue.pop();
 
-                auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
-
-                int result = regSrc1.value()->get() + regSrc2.value()->get();
-
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
+                if (ins.instruction.opcode == config::Opcode::NOP || ins.instruction.opcode == config::Opcode::HALT)
                 {
-                    P = 1;
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
                 }
-                else if (result < 0)
+                else if (ins.instruction.opcode == config::Opcode::MOVC)
                 {
-                    N = 1;
+                    auto reg = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto val = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), val}}});
                 }
-                else if (result == 0)
+                else if (ins.instruction.opcode == config::Opcode::ADD)
                 {
-                    Z = 1;
-                }
-                cout << "444444444444" << endl;
+                    printInstruction(ins.instruction);
 
-                exQueue.push({ins.address,
-                              ExResult{true, ins.instruction, RegisterInfo{ins.instruction.operand1.value(), result}}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::SUB)
-            {
+                    auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
 
-                auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
+                    int result = regSrc1.value()->get() + regSrc2.value()->get();
 
-                int result = regSrc1.value()->get() - regSrc2.value()->get();
+                    P = 0;
+                    N = 0;
+                    Z = 0;
 
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
-                {
-                    P = 1;
-                }
-                else if (result < 0)
-                {
-                    N = 1;
-                }
-                else if (result == 0)
-                {
-                    Z = 1;
-                }
-
-                exQueue.push({ins.address,
-                              ExResult{true, ins.instruction, RegisterInfo{ins.instruction.operand1.value(), result}}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::STORE)
-            {
-
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                int memoryAddress = rsrc2.value()->get() + literal;
-
-                int value = rsrc1.value()->get();
-
-                exQueue.push({ins.address, ExResult{true, ins.instruction, nullopt, MemoryInfo{memoryAddress, value}}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::STOREP)
-            {
-
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                int memoryAddress = rsrc2.value()->get() + literal;
-
-                int value = rsrc1.value()->get();
-
-                exQueue.push({ins.address, ExResult{
-                                               true,
-                                               ins.instruction,
-                                               RegisterInfo{ins.instruction.operand2.value(), rsrc2.value()->get() + 4},
-                                               MemoryInfo{memoryAddress, value},
-                                           }});
-            }
-            else if (ins.instruction.opcode == config::Opcode::ADDL)
-            {
-
-                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                int result = regSrc1.value()->get() + num;
-
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
-                {
-                    P = 1;
-                }
-                else if (result < 0)
-                {
-                    N = 1;
-                }
-                else if (result == 0)
-                {
-                    Z = 1;
-                }
-
-                exQueue.push({ins.address, ExResult{true, ins.instruction,
-                                                    RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::SUBL)
-            {
-
-                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                int result = regSrc1.value()->get() - num;
-
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
-                {
-                    P = 1;
-                }
-                else if (result < 0)
-                {
-                    N = 1;
-                }
-                else if (result == 0)
-                {
-                    Z = 1;
-                }
-
-                exQueue.push({ins.address, ExResult{true, ins.instruction,
-                                                    RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::XOR)
-            {
-
-                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
-
-                auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                int result = regSrc1.value()->get() ^ regSrc2.value()->get();
-
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
-                {
-                    P = 1;
-                }
-                else if (result < 0)
-                {
-                    N = 1;
-                }
-                else if (result == 0)
-                {
-                    Z = 1;
-                }
-
-                exQueue.push({ins.address, ExResult{true, ins.instruction,
-                                                    RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::LOAD)
-            {
-
-                auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                Result<uint8_t, Error> result =
-                    memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
-
-                exQueue.push({ins.address,
-                              ExResult{true, ins.instruction,
-                                       RegisterInfo{ins.instruction.operand1.value(), result.getValue()}, nullopt}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::LOADP)
-            {
-
-                auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                Result<uint8_t, Error> result =
-                    memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
-
-                exQueue.push(
-                    {ins.address,
-                     ExResult{true, ins.instruction, RegisterInfo{ins.instruction.operand1.value(), result.getValue()},
-                              nullopt, RegisterInfo{ins.instruction.operand2.value(), rsrc1.value()->get() + 4}}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::JALR)
-            {
-                resetQueue(fetchQueue);
-                resetQueue(dRFQueue);
-                auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
-                dRFQueue.push(inst);
-                fetchQueue.push(inst);
-
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
-
-                auto value = rsrc1.value()->get() + literal;
-
-                // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
-                cout << "PC  -2------- JALR  " << pc - 2 << "   " << ins.address << endl;
-                stopFetch = false;
-
-                exQueue.push({inst.address, ExResult{true, ins.instruction,
-                                                     RegisterInfo{ins.instruction.operand1.value(),
-                                                                  codeMemoryIndexToPC(ins.address + 1)},
-                                                     nullopt}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::JUMP)
-            {
-                resetQueue(fetchQueue);
-                resetQueue(dRFQueue);
-                auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
-                dRFQueue.push(inst);
-                fetchQueue.push(inst);
-
-                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto literal = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
-
-                auto value = rsrc1.value()->get() + literal;
-
-                cout << "VVVVVJHGHJ JKHJ ILK 0L  " << value << "  ooooooooooo" << endl;
-                pc = pcToCodeMemoryIndex(value);
-                cout << "VVVVVJHGHJ JKHJ ILK JL  " << pc << "  ooooooooooo" << endl;
-
-                exQueue.push({inst.address, ExResult{false, ins.instruction}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::CMP)
-            {
-                auto R1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
-                auto R2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
-
-                int result = R1.value()->get() - R2.value()->get();
-
-                cout << "RESULTTTTTTTTT  " << result << "  " << R1.value()->get() << " &&&   " << R2.value()->get()
-                     << endl;
-
-                P = 0;
-                N = 0;
-                Z = 0;
-
-                if (result > 0)
-                {
-                    P = 1;
-                }
-
-                if (result < 0)
-                {
-                    N = 1;
-                }
-
-                if (result == 0)
-                {
-                    Z = 1;
-                }
-
-                exQueue.push({ins.address, ExResult{false, ins.instruction}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::BNZ)
-            {
-
-                if (Z == 0)
-                {
-                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
-                    auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
-                    num = getRelativeNumber(num);
-
-                    resetQueue(fetchQueue);
-                    resetQueue(dRFQueue);
-                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
-                    dRFQueue.push(inst);
-                    fetchQueue.push(inst);
-
-                    // printQueue(dRFQueue);
-                    // printQueue(exQueue);
-                    stopFetch = false;
-
-                    cout << "nu,, " << num << "--- pc" << pc << endl;
-                    // pc = (pc + num) - 2;
-                    pc = (ins.address + num);
-                    cout << "nu,, " << num << "--- pc" << pc << endl;
-                }
-
-                exQueue.push({ins.address, ExResult{false, ins.instruction}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::BNP)
-            {
-
-                if (P == 0)
-                {
-
-                    auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
-                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
-                    num = getRelativeNumber(num);
-                    resetQueue(fetchQueue);
-                    resetQueue(dRFQueue);
-                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
-                    dRFQueue.push(inst);
-                    fetchQueue.push(inst);
-
-                    cout << "nu,, " << num << "--- pc BNP" << pc << endl;
-                    pc = (ins.address + num);
-                    cout << "nu,, " << num << "--- pc" << pc << endl;
-                }
-
-                exQueue.push({ins.address, ExResult{false, ins.instruction}});
-            }
-            else if (ins.instruction.opcode == config::Opcode::BP)
-            {
-
-                if (P == 1)
-                {
-
-                    auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
-                    // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
-                    num = getRelativeNumber(num);
-                    resetQueue(fetchQueue);
-                    resetQueue(dRFQueue);
-                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
-                    dRFQueue.push(inst);
-                    fetchQueue.push(inst);
-
-                    cout << "nu,, " << num << "--- pc" << pc << endl;
-                    pc = (ins.address + num);
-                    cout << "nu,, " << num << "--- pc" << pc << endl;
-
-                    stopFetch = false;
-                }
-
-                exQueue.push({ins.address, ExResult{false, ins.instruction}});
-            }
-
-            cout << "Execute: " << getInstructionString(ins.instruction) << endl;
-
-            // forwarding hack
-            if (IS_FORWARDING)
-            {
-                auto fakeExecQueue = copyQueue(exQueue);
-
-                auto insFake = fakeExecQueue.back();
-                printInstruction(insFake.exResult.inst);
-                if (insFake.exResult.hasUpdate)
-                {
-                    if (insFake.exResult.regInfo.has_value())
+                    if (result > 0)
                     {
-                        regFileFake.setRegFromString(insFake.exResult.regInfo->source, insFake.exResult.regInfo->value);
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+                    cout << "444444444444" << regSrc1.value()->get() << "jjjjj" << regSrc2.value()->get() << endl;
+
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), result}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::SUB)
+                {
+
+                    auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
+
+                    int result = regSrc1.value()->get() - regSrc2.value()->get();
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
                     }
 
-                    if (insFake.exResult.regInfo2.has_value())
-                    {
-                        regFileFake.setRegFromString(insFake.exResult.regInfo2->source,
-                                                     insFake.exResult.regInfo2->value);
-                    }
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), result}}});
                 }
-                // regFileFake.print();
+                else if (ins.instruction.opcode == config::Opcode::STORE)
+                {
+
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int memoryAddress = rsrc2.value()->get() + literal;
+
+                    int value = rsrc1.value()->get();
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction, nullopt, MemoryInfo{memoryAddress, value}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::STOREP)
+                {
+
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int memoryAddress = rsrc2.value()->get() + literal;
+
+                    int value = rsrc1.value()->get();
+
+                    exQueue.push(
+                        {ins.address, ExResult{
+                                          true,
+                                          ins.instruction,
+                                          RegisterInfo{ins.instruction.operand2.value(), rsrc2.value()->get() + 4},
+                                          MemoryInfo{memoryAddress, value},
+                                      }});
+                }
+                else if (ins.instruction.opcode == config::Opcode::ADDL)
+                {
+
+                    auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() + num;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::SUBL)
+                {
+
+                    auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() - num;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::XOR)
+                {
+
+                    auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
+
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() ^ regSrc2.value()->get();
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::LOAD)
+                {
+
+                    auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    Result<uint8_t, Error> result =
+                        memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
+
+                    exQueue.push(
+                        {ins.address,
+                         ExResult{true, ins.instruction,
+                                  RegisterInfo{ins.instruction.operand1.value(), result.getValue()}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::LOADP)
+                {
+
+                    auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    Result<uint8_t, Error> result =
+                        memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
+
+                    exQueue.push({ins.address,
+                                  ExResult{true, ins.instruction,
+                                           RegisterInfo{ins.instruction.operand1.value(), result.getValue()}, nullopt,
+                                           RegisterInfo{ins.instruction.operand2.value(), rsrc1.value()->get() + 4}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::JALR)
+                {
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    auto value = rsrc1.value()->get() + literal;
+
+                    // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
+                    cout << "PC  -2------- JALR  " << pc - 2 << "   " << ins.address << endl;
+                    stopFetch = false;
+
+                    exQueue.push({inst.address, ExResult{true, ins.instruction,
+                                                         RegisterInfo{ins.instruction.operand1.value(),
+                                                                      codeMemoryIndexToPC(ins.address + 1)},
+                                                         nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::JUMP)
+                {
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
+
+                    auto value = rsrc1.value()->get() + literal;
+
+                    cout << "VVVVVJHGHJ JKHJ ILK 0L  " << value << "  ooooooooooo" << endl;
+                    pc = pcToCodeMemoryIndex(value);
+                    cout << "VVVVVJHGHJ JKHJ ILK JL  " << pc << "  ooooooooooo" << endl;
+
+                    exQueue.push({inst.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::CMP)
+                {
+                    auto R1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                    auto R2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+
+                    int result = R1.value()->get() - R2.value()->get();
+
+                    cout << "RESULTTTTTTTTT  " << result << "  " << R1.value()->get() << " &&&   " << R2.value()->get()
+                         << endl;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+
+                    if (result < 0)
+                    {
+                        N = 1;
+                    }
+
+                    if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BNZ)
+                {
+
+                    if (Z == 0)
+                    {
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        num = getRelativeNumber(num);
+
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        // printQueue(dRFQueue);
+                        // printQueue(exQueue);
+                        stopFetch = false;
+
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                        // pc = (pc + num) - 2;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BNP)
+                {
+
+                    if (P == 0)
+                    {
+
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        num = getRelativeNumber(num);
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        cout << "nu,, " << num << "--- pc BNP" << pc << endl;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BP)
+                {
+
+                    if (P == 1)
+                    {
+
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        num = getRelativeNumber(num);
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+
+                        stopFetch = false;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+
+                cout << "Execute: " << getInstructionString(ins.instruction) << endl;
+
+                // forwarding hack
+                if (IS_FORWARDING)
+                {
+                    auto fakeExecQueue = copyQueue(exQueue);
+
+                    auto insFake = fakeExecQueue.back();
+                    printInstruction(insFake.exResult.inst);
+                    if (insFake.exResult.hasUpdate)
+                    {
+                        if (insFake.exResult.regInfo.has_value())
+                        {
+                            regFileFake.setRegFromString(insFake.exResult.regInfo->source,
+                                                         insFake.exResult.regInfo->value);
+                        }
+
+                        if (insFake.exResult.regInfo2.has_value())
+                        {
+                            regFileFake.setRegFromString(insFake.exResult.regInfo2->source,
+                                                         insFake.exResult.regInfo2->value);
+                        }
+                    }
+                    // regFileFake.print();
+                }
+            }
+        }
+        else
+        {
+            if (cycle > 1 && !dRFQueue.empty())
+            {
+                auto ins = dRFQueue.front();
+                dRFQueue.pop();
+
+                if (ins.instruction.opcode == config::Opcode::NOP || ins.instruction.opcode == config::Opcode::HALT)
+                {
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::MOVC)
+                {
+                    auto reg = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto val = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), val}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::ADD)
+                {
+                    printInstruction(ins.instruction);
+
+                    auto regDest = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+
+                    int result = regSrc1.value()->get() + regSrc2.value()->get();
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+                    cout << "444444444444" << regSrc1.value()->get() << "jjjjj" << regSrc2.value()->get() << endl;
+
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), result}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::SUB)
+                {
+
+                    auto regDest = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+
+                    int result = regSrc1.value()->get() - regSrc2.value()->get();
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push({ins.address, ExResult{true, ins.instruction,
+                                                        RegisterInfo{ins.instruction.operand1.value(), result}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::STORE)
+                {
+
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc2 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int memoryAddress = rsrc2.value()->get() + literal;
+
+                    int value = rsrc1.value()->get();
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction, nullopt, MemoryInfo{memoryAddress, value}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::STOREP)
+                {
+
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc2 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int memoryAddress = rsrc2.value()->get() + literal;
+
+                    int value = rsrc1.value()->get();
+
+                    exQueue.push(
+                        {ins.address, ExResult{
+                                          true,
+                                          ins.instruction,
+                                          RegisterInfo{ins.instruction.operand2.value(), rsrc2.value()->get() + 4},
+                                          MemoryInfo{memoryAddress, value},
+                                      }});
+                }
+                else if (ins.instruction.opcode == config::Opcode::ADDL)
+                {
+
+                    auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() + num;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::SUBL)
+                {
+
+                    auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() - num;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::XOR)
+                {
+
+                    auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+
+                    auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    int result = regSrc1.value()->get() ^ regSrc2.value()->get();
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+                    else if (result < 0)
+                    {
+                        N = 1;
+                    }
+                    else if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push(
+                        {ins.address, ExResult{true, ins.instruction,
+                                               RegisterInfo{ins.instruction.operand1.value(), result}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::LOAD)
+                {
+
+                    auto rDest = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    Result<uint8_t, Error> result =
+                        memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
+
+                    exQueue.push(
+                        {ins.address,
+                         ExResult{true, ins.instruction,
+                                  RegisterInfo{ins.instruction.operand1.value(), result.getValue()}, nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::LOADP)
+                {
+
+                    auto rDest = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    Result<uint8_t, Error> result =
+                        memory.read(rsrc1.value()->get() + literal); // Store the result in a variable
+
+                    exQueue.push({ins.address,
+                                  ExResult{true, ins.instruction,
+                                           RegisterInfo{ins.instruction.operand1.value(), result.getValue()}, nullopt,
+                                           RegisterInfo{ins.instruction.operand2.value(), rsrc1.value()->get() + 4}}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::JALR)
+                {
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
+
+                    auto value = rsrc1.value()->get() + literal;
+
+                    // pc -2 gives the address of instruction after JALR because we already flushed 2 inst..
+                    cout << "PC  -2------- JALR  " << pc - 2 << "   " << ins.address << endl;
+                    stopFetch = false;
+
+                    exQueue.push({inst.address, ExResult{true, ins.instruction,
+                                                         RegisterInfo{ins.instruction.operand1.value(),
+                                                                      codeMemoryIndexToPC(ins.address + 1)},
+                                                         nullopt}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::JUMP)
+                {
+                    resetQueue(fetchQueue);
+                    resetQueue(dRFQueue);
+                    auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                    dRFQueue.push(inst);
+                    fetchQueue.push(inst);
+
+                    auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto literal = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
+
+                    auto value = rsrc1.value()->get() + literal;
+
+                    cout << "VVVVVJHGHJ JKHJ ILK 0L  " << value << "  ooooooooooo" << endl;
+                    pc = pcToCodeMemoryIndex(value);
+                    cout << "VVVVVJHGHJ JKHJ ILK JL  " << pc << "  ooooooooooo" << endl;
+
+                    exQueue.push({inst.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::CMP)
+                {
+                    auto R1 = regFile.getRegFromString(ins.instruction.operand1.value());
+                    auto R2 = regFile.getRegFromString(ins.instruction.operand2.value());
+
+                    int result = R1.value()->get() - R2.value()->get();
+
+                    cout << "RESULTTTTTTTTT  " << result << "  " << R1.value()->get() << " &&&   " << R2.value()->get()
+                         << endl;
+
+                    P = 0;
+                    N = 0;
+                    Z = 0;
+
+                    if (result > 0)
+                    {
+                        P = 1;
+                    }
+
+                    if (result < 0)
+                    {
+                        N = 1;
+                    }
+
+                    if (result == 0)
+                    {
+                        Z = 1;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BNZ)
+                {
+
+                    if (Z == 0)
+                    {
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        num = getRelativeNumber(num);
+
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        // printQueue(dRFQueue);
+                        // printQueue(exQueue);
+                        stopFetch = false;
+
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                        // pc = (pc + num) - 2;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BNP)
+                {
+
+                    if (P == 0)
+                    {
+
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        num = getRelativeNumber(num);
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        cout << "nu,, " << num << "--- pc BNP" << pc << endl;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+                else if (ins.instruction.opcode == config::Opcode::BP)
+                {
+
+                    if (P == 1)
+                    {
+
+                        auto num = getNumberFromLiteral(ins.instruction.operand1.value()).getValue();
+                        // auto num = getRelativeNumber(getNumberFromLiteral(ins.operand1.value()).getValue());
+                        num = getRelativeNumber(num);
+                        resetQueue(fetchQueue);
+                        resetQueue(dRFQueue);
+                        auto inst = InstructionInfo{99, Instruction{config::Opcode::NOP}};
+                        dRFQueue.push(inst);
+                        fetchQueue.push(inst);
+
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+                        pc = (ins.address + num);
+                        cout << "nu,, " << num << "--- pc" << pc << endl;
+
+                        stopFetch = false;
+                    }
+
+                    exQueue.push({ins.address, ExResult{false, ins.instruction}});
+                }
+
+                cout << "Execute: " << getInstructionString(ins.instruction) << endl;
             }
         }
 
