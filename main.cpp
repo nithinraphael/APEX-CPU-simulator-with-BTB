@@ -349,6 +349,32 @@ bool shouldStallFETCH(Instruction second, queue<Instruction> dRFQueue)
 int main(int argc, char* argv[])
 {
 
+    if (argc != 4)
+    {
+        std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
+        return 1; // Exit with an error code
+    }
+
+    std::string inputFileName = argv[1];
+    if (std::string(argv[2]) != "simulate")
+    {
+        std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
+        return 1; // Exit with an error code
+    }
+
+    // Convert the command-line argument (string) to an integer
+    int numSimulations = 100; // Initialize to a default value
+
+    try
+    {
+        numSimulations = std::stoi(removeSpaces(argv[3])); // Use std::stoi for string to int conversion
+    }
+    catch (const std::invalid_argument& e)
+    {
+        std::cerr << "Err argparse" << std::endl;
+        return 1; // Exit with an error code
+    }
+
     Result<string, Error> filenameRes = getFileNameCMD(argc, argv);
     if (filenameRes.isError())
     {
@@ -397,7 +423,7 @@ int main(int argc, char* argv[])
     bool stall = false;
 
     // while (stopFetch == false || !wbQueue.empty())
-    while (cycle != 100)
+    while (cycle != numSimulations)
     {
         cout << "\n---------- Cycle " << cycle + 1 << " ----------" << endl;
 
