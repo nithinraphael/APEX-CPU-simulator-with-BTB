@@ -92,4 +92,88 @@ class RegisterFile
 
     unique_ptr<Register> registers[config::CPU::TOTAL_REGISTERS];
 };
+
+class RegisterFileFake
+{
+  public:
+    static RegisterFileFake& instance()
+    {
+        static RegisterFileFake instance;
+        return instance;
+    }
+
+    RegisterFileFake(const RegisterFileFake&) = delete;
+    RegisterFileFake& operator=(const RegisterFileFake&) = delete;
+
+    optional<Register*> get(int index)
+    {
+        if (index >= 0 && index < config::CPU::TOTAL_REGISTERS)
+        {
+            return registers[index].get();
+        }
+        return nullopt;
+    }
+
+    optional<Register*> getRegFromString(const std::string& regStr)
+    {
+
+        auto registerIndex = Register::getIndexFromString(regStr);
+        if (registerIndex.isOk())
+        {
+            int index = registerIndex.getValue();
+            return get(index);
+        }
+        return nullopt;
+    }
+
+    // TODO use result
+    void setRegFromString(const std::string& regStr, int value)
+    {
+
+        auto registerIndex = Register::getIndexFromString(regStr);
+        if (registerIndex.isOk())
+        {
+            int index = registerIndex.getValue();
+            auto regRes = get(index);
+
+            if (regRes.has_value())
+            {
+                regRes.value()->set(value);
+            }
+            else
+            {
+                cout << "Some register error" << endl;
+            }
+        }
+    }
+
+    void print()
+    {
+        cout << "............... Register File ..............." << endl;
+        for (int i = 0; i < config::CPU::TOTAL_REGISTERS; i++)
+        {
+            if (auto registerPtr = get(i))
+            {
+                std::cout << "R" << i << " [" << (*registerPtr)->get() << "]  | ";
+                if (i == (config::CPU::TOTAL_REGISTERS - 1) / 2)
+                {
+                    cout << "\n";
+                }
+            }
+        }
+        cout << endl;
+        cout << "............................................." << endl;
+    }
+
+  private:
+    RegisterFileFake()
+    {
+        for (int i = 0; i < config::CPU::TOTAL_REGISTERS; i++)
+        {
+            registers[i] = make_unique<Register>(i);
+        }
+    }
+
+    unique_ptr<Register> registers[config::CPU::TOTAL_REGISTERS];
+};
 } // namespace core

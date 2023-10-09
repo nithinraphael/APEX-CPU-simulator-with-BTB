@@ -3,6 +3,7 @@
 #include "core/index.hpp"
 #include "core/memory.hpp"
 #include "core/register.hpp"
+#include "core/register_file.hpp"
 #include "errors/index.hpp"
 #include "fs/index.hpp"
 #include "instruction/all_instructions.hpp"
@@ -29,10 +30,28 @@ using namespace instruction;
 using namespace errors;
 using namespace core;
 
+const bool IS_FORWARDING = true;
+
 template <typename T> void resetQueue(std::queue<T>& q)
 {
     std::queue<T> empty;
     std::swap(q, empty);
+}
+
+template <typename T> T getLastElementQueue(const std::queue<T>& inputQueue)
+{
+    std::queue<T> tempQueue = inputQueue; // Make a copy of the input queue
+    std::queue<T> reversedQueue;          // Create a temporary queue for reversing
+
+    // Reverse the order of elements
+    while (!tempQueue.empty())
+    {
+        reversedQueue.push(tempQueue.front());
+        tempQueue.pop();
+    }
+
+    // The front element of the reversed queue is the last element of the original queue
+    return reversedQueue.front();
 }
 
 void printQueue(const std::queue<Instruction>& q)
@@ -96,7 +115,7 @@ struct InstructionInfoExResult
 
 template <typename T> std::queue<T> copyQueue(const std::queue<T>& original)
 {
-    std::queue<T> copiedQueue = original; // Create a copy using the copy constructor
+    std::queue<T> copiedQueue = original;
     return copiedQueue;
 }
 
@@ -358,6 +377,7 @@ int main(int argc, char* argv[])
     iSeq.init(instructionListRes.getValue());
 
     RegisterFile& regFile = RegisterFile::instance();
+    RegisterFileFake& regFileFake = RegisterFileFake::instance();
     Memory& memory = Memory::instance();
 
     iSeq.printSeq(true);
@@ -414,6 +434,8 @@ int main(int argc, char* argv[])
                 fakeFetchQueue.push(InstructionInfo{pc, inst});
                 bool mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
 
+                mustStall = false;
+
                 // cout << "FETCH STALL:  " << mustStall << endl;
                 if (!mustStall)
                 {
@@ -433,6 +455,8 @@ int main(int argc, char* argv[])
         {
             stall = shouldStall(fetchQueue, dRFQueue, exQueue);
             // cout << "DECODE STALL:  " << stall << endl;
+
+            stall = false;
 
             auto insDRF = fetchQueue.front();
             if (!stall)
@@ -467,7 +491,7 @@ int main(int argc, char* argv[])
             }
             else if (ins.instruction.opcode == config::Opcode::MOVC)
             {
-                auto reg = regFile.getRegFromString(ins.instruction.operand1.value());
+                auto reg = regFileFake.getRegFromString(ins.instruction.operand1.value());
                 auto val = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
                 exQueue.push({ins.address,
                               ExResult{true, ins.instruction, RegisterInfo{ins.instruction.operand1.value(), val}}});
@@ -475,9 +499,9 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::ADD)
             {
 
-                auto regDest = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+                auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
 
                 int result = regSrc1.value()->get() + regSrc2.value()->get();
 
@@ -505,9 +529,9 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::SUB)
             {
 
-                auto regDest = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+                auto regDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
 
                 int result = regSrc1.value()->get() - regSrc2.value()->get();
 
@@ -534,8 +558,8 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::STORE)
             {
 
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc2 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 int memoryAddress = rsrc2.value()->get() + literal;
@@ -547,8 +571,8 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::STOREP)
             {
 
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc2 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto rsrc2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 int memoryAddress = rsrc2.value()->get() + literal;
@@ -565,7 +589,7 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::ADDL)
             {
 
-                auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 int result = regSrc1.value()->get() + num;
@@ -593,7 +617,7 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::SUBL)
             {
 
-                auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 int result = regSrc1.value()->get() - num;
@@ -621,8 +645,8 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::XOR)
             {
 
-                auto regSrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
-                auto regSrc2 = regFile.getRegFromString(ins.instruction.operand3.value());
+                auto regSrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
+                auto regSrc2 = regFileFake.getRegFromString(ins.instruction.operand3.value());
 
                 auto num = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
@@ -651,8 +675,8 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::LOAD)
             {
 
-                auto rDest = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 Result<uint8_t, Error> result =
@@ -665,8 +689,8 @@ int main(int argc, char* argv[])
             else if (ins.instruction.opcode == config::Opcode::LOADP)
             {
 
-                auto rDest = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto rDest = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 Result<uint8_t, Error> result =
@@ -685,7 +709,7 @@ int main(int argc, char* argv[])
                 dRFQueue.push(inst);
                 fetchQueue.push(inst);
 
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand2.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand3.value()).getValue();
 
                 auto value = rsrc1.value()->get() + literal;
@@ -707,7 +731,7 @@ int main(int argc, char* argv[])
                 dRFQueue.push(inst);
                 fetchQueue.push(inst);
 
-                auto rsrc1 = regFile.getRegFromString(ins.instruction.operand1.value());
+                auto rsrc1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
                 auto literal = getNumberFromLiteral(ins.instruction.operand2.value()).getValue();
 
                 auto value = rsrc1.value()->get() + literal;
@@ -720,10 +744,13 @@ int main(int argc, char* argv[])
             }
             else if (ins.instruction.opcode == config::Opcode::CMP)
             {
-                auto R1 = regFile.getRegFromString(ins.instruction.operand1.value());
-                auto R2 = regFile.getRegFromString(ins.instruction.operand2.value());
+                auto R1 = regFileFake.getRegFromString(ins.instruction.operand1.value());
+                auto R2 = regFileFake.getRegFromString(ins.instruction.operand2.value());
 
                 int result = R1.value()->get() - R2.value()->get();
+
+                cout << "RESULTTTTTTTTT  " << result << "  " << R1.value()->get() << " &&&   " << R2.value()->get()
+                     << endl;
 
                 P = 0;
                 N = 0;
@@ -733,11 +760,13 @@ int main(int argc, char* argv[])
                 {
                     P = 1;
                 }
-                else if (result < 0)
+
+                if (result < 0)
                 {
                     N = 1;
                 }
-                else if (result == 0)
+
+                if (result == 0)
                 {
                     Z = 1;
                 }
@@ -819,6 +848,29 @@ int main(int argc, char* argv[])
             }
 
             cout << "Execute: " << getInstructionString(ins.instruction) << endl;
+
+            // forwarding hack
+            if (IS_FORWARDING)
+            {
+                auto fakeExecQueue = copyQueue(exQueue);
+
+                auto insFake = fakeExecQueue.back();
+                printInstruction(insFake.exResult.inst);
+                if (insFake.exResult.hasUpdate)
+                {
+                    if (insFake.exResult.regInfo.has_value())
+                    {
+                        regFileFake.setRegFromString(insFake.exResult.regInfo->source, insFake.exResult.regInfo->value);
+                    }
+
+                    if (insFake.exResult.regInfo2.has_value())
+                    {
+                        regFileFake.setRegFromString(insFake.exResult.regInfo2->source,
+                                                     insFake.exResult.regInfo2->value);
+                    }
+                }
+                // regFileFake.print();
+            }
         }
 
         // MEMORY

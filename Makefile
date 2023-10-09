@@ -2,7 +2,7 @@ CXX = clang++
 CXXFLAGS = -std=c++20
 BUILD_DIR = build
 INPUT_FILES_DIR = input
-INPUT_FILE = t8.asm
+INPUT_FILE = t8f.asm
 TARGET = $(BUILD_DIR)/apex-sim
 SRC = main.cpp
 INPUT = $(INPUT_FILES_DIR)/$(INPUT_FILE)
