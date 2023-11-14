@@ -38,22 +38,6 @@ template <typename T> void resetQueue(std::queue<T>& q)
     std::swap(q, empty);
 }
 
-template <typename T> T getLastElementQueue(const std::queue<T>& inputQueue)
-{
-    std::queue<T> tempQueue = inputQueue; // Make a copy of the input queue
-    std::queue<T> reversedQueue;          // Create a temporary queue for reversing
-
-    // Reverse the order of elements
-    while (!tempQueue.empty())
-    {
-        reversedQueue.push(tempQueue.front());
-        tempQueue.pop();
-    }
-
-    // The front element of the reversed queue is the last element of the original queue
-    return reversedQueue.front();
-}
-
 void printQueue(const std::queue<Instruction>& q)
 {
     std::queue<Instruction> tempQueue = q; // Create a copy of the queue
@@ -296,15 +280,10 @@ bool shouldStall(queue<InstructionInfo> fetchQueue, queue<InstructionInfo> dRFQu
     {
         auto first = dRFQueue.front();
         auto second = fetchQueue.front();
-        // cout << "88888888" << endl;
-        // printInstruction(first);
-        // printInstruction(second);
+
         if (shouldStallHelper(first.instruction, second.instruction))
         {
-            // printOpcode(first.opcode);
-            // printOpcode(second.opcode);
-            // cout << "11111111111111111" << endl;
-            return true; // Stall due to data hazard.
+            return true;
         }
     }
 
@@ -313,11 +292,9 @@ bool shouldStall(queue<InstructionInfo> fetchQueue, queue<InstructionInfo> dRFQu
 
         auto first = exQueue.front();
         auto second = fetchQueue.front();
-        // cout << "999999999" << endl;
 
         if (shouldStallHelper(first.exResult.inst, second.instruction))
         {
-            // cout << "222222222222222222" << endl;
             return true; // Stall due to data hazard.
         }
     }
@@ -349,30 +326,7 @@ bool shouldStallFETCH(Instruction second, queue<Instruction> dRFQueue)
 int main(int argc, char* argv[])
 {
 
-    // if (argc != 4)
-    // {
-    //     std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
-    //     return 1;
-    // }
-
-    // std::string inputFileName = argv[1];
-    // if (std::string(argv[2]) != "simulate")
-    // {
-    //     std::cerr << "Usage: " << argv[0] << " <input_file> simulate <n>" << std::endl;
-    //     return 1;
-    // }
-
     int numSimulations = 100;
-
-    // try
-    // {
-    //     numSimulations = std::stoi(removeSpaces(argv[3]));
-    // }
-    // catch (const std::invalid_argument& e)
-    // {
-    //     std::cerr << "Err argparse" << std::endl;
-    //     return 1;
-    // }
 
     Result<string, Error> filenameRes = getFileNameCMD(argc, argv);
     if (filenameRes.isError())
@@ -1343,11 +1297,23 @@ int main(int argc, char* argv[])
 
         cout << "P: " << P << " N: " << N << " Z: " << Z << " PC: " << pc << endl;
 
-        // Result<uint8_t, Error> result = memory.read(12); // Store the result in a variable
-        // if (result.isOk())
-        // {
-        //     cout << "MEM READ: " << static_cast<int>(result.getValue()) << endl;
-        // }
+        Result<uint8_t, Error> result = memory.read(1004); // Store the result in a variable
+        if (result.isOk())
+        {
+            cout << "MEM READ: " << static_cast<int>(result.getValue()) << endl;
+        }
+        Result<uint8_t, Error> result2 = memory.read(1008); // Store the result in a variable
+        if (result.isOk())
+        {
+            cout << "MEM READ: " << static_cast<int>(result2.getValue()) << endl;
+        }
+
+        Result<uint8_t, Error> result3 = memory.read(1012); // Store the result in a variable
+        if (result.isOk())
+        {
+            cout << "MEM READ: " << static_cast<int>(result3.getValue()) << endl;
+        }
+
         cin.get();
 
         cycle++;
