@@ -1,0 +1,5 @@
+MOVC R0, #8
+MOVC R1, #2
+CMP R0, R1
+BP #-4
+HALT

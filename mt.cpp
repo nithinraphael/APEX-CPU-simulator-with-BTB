@@ -387,6 +387,7 @@ int main(int argc, char* argv[])
                     resetQueue(dRFQueue);
 
                     dRFQueue.push({nop, {}, {}});
+                    dRFQueue.push({nop, {}, {}});
 
                     fetchQueue.push({nop, {}, {}});
                     PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber;

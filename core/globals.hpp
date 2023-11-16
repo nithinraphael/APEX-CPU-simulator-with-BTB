@@ -35,10 +35,10 @@ class InstructionSequence
         return *sequence;
     }
 
-    const void printSeq(bool isDebug)
-    {
-        printInstructionList(*sequence, isDebug);
-    }
+    // const void printSeq(bool isDebug)
+    // {
+    //     printInstructionList(*sequence, isDebug);
+    // }
 
   private:
     InstructionSequence()

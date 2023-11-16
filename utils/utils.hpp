@@ -6,6 +6,8 @@
 #include <algorithm>
 #include <cctype>
 #include <locale>
+#include <map>
+#include <queue>
 #include <regex>
 #include <sstream>
 #include <string>
@@ -54,7 +56,7 @@ inline string replaceSpacesWith(const string& input, const string& with)
 
     return regex_replace(input, pattern, with);
 }
-
+// replaces multiple commas with one comma
 inline string replaceCommasWith(const string& input, const string& with)
 {
     regex pattern(",+");
@@ -106,6 +108,49 @@ inline int getRelativeNumber(int num)
 inline int codeMemoryIndexToPC(int memoryIndex)
 {
     return memoryIndex * 4 + config::CPU::PROGRAM_COUNTER_START_ADDRESS;
+}
+
+inline void printStringVector(const vector<string>& vec)
+{
+    for (const string& str : vec)
+    {
+        cout << str << " "
+             << "\n";
+    }
+    cout << endl;
+}
+
+inline template <typename T> void resetQueue(std::queue<T>& q)
+{
+    std::queue<T> empty;
+    std::swap(q, empty);
+}
+
+inline template <typename KeyType, typename ValueType>
+bool keyExistsInMap(const std::map<KeyType, ValueType>& mapToTest, const KeyType& keyToCheck)
+{
+    return mapToTest.find(keyToCheck) != mapToTest.end();
+}
+
+template <typename T> std::queue<T> copyQueue(const std::queue<T>& originalQueue)
+{
+    std::queue<T> copiedQueue;
+
+    // Deep copy the original queue
+    std::queue<T> tempQueue = originalQueue;
+    while (!tempQueue.empty())
+    {
+        // Get the front element of the original queue
+        T frontElement = tempQueue.front();
+
+        // Pop the element from the temporary queue
+        tempQueue.pop();
+
+        // Copy the element and push it onto the new queue
+        copiedQueue.push(frontElement);
+    }
+
+    return copiedQueue;
 }
 
 } // namespace utils
