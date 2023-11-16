@@ -162,6 +162,19 @@ void performCommonOperations(queue<Pipe>& fetchQueue, queue<Pipe>& dRFQueue, int
     PC = pcToCodeMemoryIndex(address) + pcRelativeNumber;
 }
 
+void printQueues(queue<Pipe> fetchQueue, queue<Pipe> dRFQueue, queue<Pipe> exQueue, queue<Pipe> memQueue)
+{
+    cout << "Fetch Queue: (DECODE) " << endl;
+    printQueueContents(fetchQueue);
+    cout << "Decode/RF Queue: (EXECUTE) " << endl;
+    printQueueContents(dRFQueue);
+    cout << "Execute Queue: (MEMORY)" << endl;
+    printQueueContents(exQueue);
+    cout << "Memory Queue: (WRITEBACK)" << endl;
+    printQueueContents(memQueue);
+    cout << endl;
+}
+
 int main(int argc, char* argv[])
 {
     // 0 corresponds with 4000
@@ -217,15 +230,7 @@ int main(int argc, char* argv[])
              << "\n"
              << endl;
 
-        cout << "Fetch Queue: (DECODE) " << endl;
-        printQueueContents(fetchQueue);
-        cout << "Decode/RF Queue: (EXECUTE) " << endl;
-        printQueueContents(dRFQueue);
-        cout << "Execute Queue: (MEMORY)" << endl;
-        printQueueContents(exQueue);
-        cout << "Memory Queue: (WRITEBACK)" << endl;
-        printQueueContents(memQueue);
-        cout << endl;
+        // printQueues(fetchQueue, dRFQueue, exQueue, memQueue);
 
         if (!STOP_FETCH)
         {
@@ -283,6 +288,7 @@ int main(int argc, char* argv[])
 
         if (CYCLE > 1 && !dRFQueue.empty())
         {
+            bool POP_DRF_QUEUE = true;
             auto instructionEXECUTE = dRFQueue.front();
             auto opcode = instructionEXECUTE.instruction.opcode;
             printStageInstruction("EXECUTE", instructionEXECUTE.instruction);
@@ -356,6 +362,7 @@ int main(int argc, char* argv[])
                     dRFQueue.push({nop, {}, {}});
                     fetchQueue.push({nop, {}, {}});
                     PC = pcToCodeMemoryIndex(literal);
+                    POP_DRF_QUEUE = false;
 
                     exQueue.push(instructionEXECUTE);
                 }
@@ -378,19 +385,11 @@ int main(int argc, char* argv[])
                      (opcode == config::Opcode::BN && N == 1) || (opcode == config::Opcode::BNN && N == 0) ||
                      (opcode == config::Opcode::BZ && Z == 1) || (opcode == config::Opcode::BNZ && Z == 0)))
                 {
-                    // performCommonOperations(fetchQueue, dRFQueue, PC, instructionEXECUTE.instruction.address,
-                    //                         pcRelativeNumber);
+                    performCommonOperations(fetchQueue, dRFQueue, PC, instructionEXECUTE.instruction.address,
+                                            pcRelativeNumber);
 
-                    auto nop = createNOP();
-
-                    resetQueue(fetchQueue);
-                    resetQueue(dRFQueue);
-
-                    dRFQueue.push({nop, {}, {}});
-
-                    fetchQueue.push({nop, {}, {}});
-                    PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber;
                     cout << "BRANCHING TO: " << instructionEXECUTE.instruction.address + literal << endl;
+                    POP_DRF_QUEUE = false;
                     STOP_FETCH = false;
                 }
 
@@ -477,7 +476,11 @@ int main(int argc, char* argv[])
                                 instructionEXECUTE.instruction.address + 4}}});
             }
 
-            dRFQueue.pop();
+            if (POP_DRF_QUEUE == true)
+            {
+
+                dRFQueue.pop();
+            }
         }
 
         if (CYCLE > 2 && !exQueue.empty())
@@ -510,15 +513,7 @@ int main(int argc, char* argv[])
 
         regFile.print();
 
-        cout << "Fetch Queue: (DECODE) " << endl;
-        printQueueContents(fetchQueue);
-        cout << "Decode/RF Queue: (EXECUTE) " << endl;
-        printQueueContents(dRFQueue);
-        cout << "Execute Queue: (MEMORY)" << endl;
-        printQueueContents(exQueue);
-        cout << "Memory Queue: (WRITEBACK)" << endl;
-        printQueueContents(memQueue);
-        cout << endl;
+        // printQueues(fetchQueue, dRFQueue, exQueue, memQueue);
 
         cout << "P: " << P << " Z: " << Z << " N: " << N << endl;
 
