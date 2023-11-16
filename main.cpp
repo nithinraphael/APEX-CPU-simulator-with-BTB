@@ -32,7 +32,7 @@ using namespace errors;
 using namespace core;
 
 const bool IS_FORWARDING = false;
-const int NUM_SIMULATION_CYCLES = 40;
+const int NUM_SIMULATION_CYCLES = 50;
 
 void resetAndUpdatePNZ(int& P, int& N, int& Z, int result)
 {
@@ -361,8 +361,10 @@ int main(int argc, char* argv[])
                     auto nop = createNOP();
                     dRFQueue.push({nop, {}, {}});
                     fetchQueue.push({nop, {}, {}});
-                    PC = pcToCodeMemoryIndex(literal);
+                    auto location = source1->get() + literal;
+                    PC = pcToCodeMemoryIndex(location);
                     POP_DRF_QUEUE = false;
+                    STOP_FETCH = false;
 
                     exQueue.push(instructionEXECUTE);
                 }
@@ -469,6 +471,14 @@ int main(int argc, char* argv[])
                 auto literal = instructionEXECUTE.instruction.literal.value();
 
                 PC = pcToCodeMemoryIndex(regSrc1->get() + literal);
+
+                resetQueue(fetchQueue);
+                resetQueue(dRFQueue);
+                auto nop = createNOP();
+                dRFQueue.push({nop, {}, {}});
+                fetchQueue.push({nop, {}, {}});
+                POP_DRF_QUEUE = false;
+                STOP_FETCH = false;
 
                 exQueue.push({instructionEXECUTE.instruction,
                               {},
