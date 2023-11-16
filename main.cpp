@@ -31,7 +31,7 @@ using namespace instruction;
 using namespace errors;
 using namespace core;
 
-const bool IS_FORWARDING = false;
+const bool IS_FORWARDING = true;
 const int NUM_SIMULATION_CYCLES = 50;
 
 void resetAndUpdatePNZ(int& P, int& N, int& Z, int result)
@@ -117,6 +117,69 @@ bool shouldStallHelper(const Instruction& current, const Instruction& previous)
     return false;
 }
 
+bool shouldStallHelperForwarding(const Instruction& current, const Instruction& previous)
+{
+    if (previous.opcode == config::Opcode::LOAD || previous.opcode == config::Opcode::LOADP ||
+        previous.opcode == config::Opcode::STORE || previous.opcode == config::Opcode::STOREP)
+    {
+
+        // if (previous.opcode == config::Opcode::STOREP)
+        // {
+        //     cout << "STALL STOREP" << endl;
+        //     if (current.source1 && (current.source1 == previous.source2))
+        //     {
+        //         // Hazard: Source1 of current instruction depends on the result of the previous instruction
+        //         return true;
+        //     }
+
+        //     if (current.source2 && (current.source2 == previous.source2))
+        //     {
+        //         // Hazard: Source2 of current instruction depends on the result of the previous instruction
+        //         return true;
+        //     }
+
+        //     return false;
+        // }
+
+        if (previous.opcode == config::Opcode::LOAD)
+        {
+            if (current.source1 && (current.source1 == previous.destination))
+            {
+                // Hazard: Source1 of current instruction depends on the result of the previous instruction
+                return true;
+            }
+
+            if (current.source2 && (current.source2 == previous.destination))
+            {
+                // Hazard: Source2 of current instruction depends on the result of the previous instruction
+                return true;
+            }
+
+            return false;
+        }
+        else if (previous.opcode == config::Opcode::LOADP)
+        {
+            if (current.source1 && (current.source1 == previous.destination || current.source1 == previous.source1))
+            {
+                // Hazard: Source1 of current instruction depends on the result of the previous instruction
+                return true;
+            }
+
+            if (current.source2 && (current.source2 == previous.destination || current.source1 == previous.source1))
+            {
+                // Hazard: Source2 of current instruction depends on the result of the previous instruction
+                return true;
+            }
+
+            return false;
+        }
+
+        return false;
+    }
+
+    return false;
+}
+
 bool shouldStall(queue<Pipe> fetchQueue, queue<Pipe> dRFQueue, queue<Pipe> exQueue)
 {
     if (!fetchQueue.empty() && !dRFQueue.empty())
@@ -137,6 +200,34 @@ bool shouldStall(queue<Pipe> fetchQueue, queue<Pipe> dRFQueue, queue<Pipe> exQue
         auto first = fetchQueue.front();
 
         if (shouldStallHelper(first.instruction, second.instruction))
+        {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+bool shouldStallForwarding(queue<Pipe> fetchQueue, queue<Pipe> dRFQueue, queue<Pipe> exQueue)
+{
+    if (!fetchQueue.empty() && !dRFQueue.empty())
+    {
+        auto second = dRFQueue.front();
+        auto first = fetchQueue.front();
+
+        if (shouldStallHelperForwarding(first.instruction, second.instruction))
+        {
+            return true;
+        }
+    }
+
+    if (!dRFQueue.empty() && !exQueue.empty())
+    {
+
+        auto second = exQueue.front();
+        auto first = dRFQueue.front();
+
+        if (shouldStallHelperForwarding(first.instruction, second.instruction))
         {
             return true;
         }
@@ -194,6 +285,7 @@ int main(int argc, char* argv[])
     queue<Pipe> memQueue;
 
     RegisterFile& regFile = RegisterFile::instance();
+    RegisterFileFake& regFileForward = RegisterFileFake::instance();
     Memory& memory = Memory::instance();
 
     Result<string, Error> filenameRes = getFileNameCMD(argc, argv);
@@ -242,7 +334,16 @@ int main(int argc, char* argv[])
                 auto instructionFETCH = instructionMap[instMemLocation];
                 auto fakeFetchQueue = copyQueue(fetchQueue);
                 fakeFetchQueue.push({instructionFETCH});
-                bool mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
+                bool mustStall = false;
+
+                if (IS_FORWARDING)
+                {
+                    mustStall = shouldStallForwarding(fakeFetchQueue, dRFQueue, exQueue);
+                }
+                else
+                {
+                    mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
+                }
 
                 if (!mustStall)
                 {
@@ -261,8 +362,17 @@ int main(int argc, char* argv[])
 
         if (CYCLE > 0 && !fetchQueue.empty())
         {
-            STALL = shouldStall(fetchQueue, dRFQueue, exQueue);
+            STALL = false;
             auto instructionDECODE = fetchQueue.front();
+
+            if (IS_FORWARDING)
+            {
+                STALL = shouldStallForwarding(fetchQueue, dRFQueue, exQueue);
+            }
+            else
+            {
+                STALL = shouldStall(fetchQueue, dRFQueue, exQueue);
+            }
 
             if (!STALL)
             {
@@ -488,8 +598,21 @@ int main(int argc, char* argv[])
 
             if (POP_DRF_QUEUE == true)
             {
-
                 dRFQueue.pop();
+            }
+
+            if (IS_FORWARDING)
+            {
+                auto forwardingQueue = copyQueue(exQueue);
+
+                auto instructionBack = forwardingQueue.back();
+
+                // printStageInstruction("WRITEBACK", instructionWRITEBACK.instruction);
+
+                for (auto& regUpdate : instructionBack.registerUpdates)
+                {
+                    regFile.setRegFromString(regUpdate.registerName, regUpdate.value);
+                }
             }
         }
 
@@ -514,14 +637,30 @@ int main(int argc, char* argv[])
 
             printStageInstruction("WRITEBACK", instructionWRITEBACK.instruction);
 
-            for (auto& regUpdate : instructionWRITEBACK.registerUpdates)
+            if (IS_FORWARDING)
             {
-                regFile.setRegFromString(regUpdate.registerName, regUpdate.value);
+                {
+                    for (auto& regUpdate : instructionWRITEBACK.registerUpdates)
+                        regFileForward.setRegFromString(regUpdate.registerName, regUpdate.value);
+                }
             }
+            else
+            {
+                for (auto& regUpdate : instructionWRITEBACK.registerUpdates)
+                    regFile.setRegFromString(regUpdate.registerName, regUpdate.value);
+            }
+
             memQueue.pop();
         }
 
-        regFile.print();
+        if (IS_FORWARDING)
+        {
+            regFileForward.print();
+        }
+        else
+        {
+            regFile.print();
+        }
 
         // printQueues(fetchQueue, dRFQueue, exQueue, memQueue);
 
