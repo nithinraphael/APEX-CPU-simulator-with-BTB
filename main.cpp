@@ -31,8 +31,28 @@ using namespace instruction;
 using namespace errors;
 using namespace core;
 
-const bool IS_FORWARDING = true;
-const int NUM_SIMULATION_CYCLES = 50;
+const bool IS_FORWARDING = false;
+const int NUM_SIMULATION_CYCLES = 200;
+bool HALT_REACHED = false;
+
+template <typename T> void putElementAtFront(std::queue<T>& myQueue, const T& element)
+{
+    std::queue<T> tempQueue;
+
+    tempQueue.push(element);
+
+    while (!myQueue.empty())
+    {
+        tempQueue.push(myQueue.front());
+        myQueue.pop();
+    }
+
+    while (!tempQueue.empty())
+    {
+        myQueue.push(tempQueue.front());
+        tempQueue.pop();
+    }
+}
 
 void resetAndUpdatePNZ(int& P, int& N, int& Z, int result)
 {
@@ -287,6 +307,7 @@ int main(int argc, char* argv[])
     RegisterFile& regFile = RegisterFile::instance();
     RegisterFileFake& regFileForward = RegisterFileFake::instance();
     Memory& memory = Memory::instance();
+    BranchTargetBuffer btb;
 
     Result<string, Error> filenameRes = getFileNameCMD(argc, argv);
     if (filenameRes.isError())
@@ -332,9 +353,30 @@ int main(int argc, char* argv[])
             if (keyExistsInMap(instructionMap, instMemLocation))
             {
                 auto instructionFETCH = instructionMap[instMemLocation];
+                auto [btbHit, targetAddress] =
+                    btb.predictBranchOutcome(instructionFETCH.opcode, instructionFETCH.address);
+                bool mustStall = false;
+
                 auto fakeFetchQueue = copyQueue(fetchQueue);
                 fakeFetchQueue.push({instructionFETCH});
-                bool mustStall = false;
+
+                if (btbHit)
+                {
+                    cout << "BTB HIT" << endl;
+
+                    if (IS_FORWARDING)
+                    {
+                        mustStall = shouldStallForwarding(fakeFetchQueue, dRFQueue, exQueue);
+                    }
+                    else
+                    {
+                        mustStall = shouldStall(fakeFetchQueue, dRFQueue, exQueue);
+                    }
+                    if (!mustStall)
+                    {
+                        PC = pcToCodeMemoryIndex(targetAddress.value());
+                    }
+                }
 
                 if (IS_FORWARDING)
                 {
@@ -347,11 +389,16 @@ int main(int argc, char* argv[])
 
                 if (!mustStall)
                 {
+
+                    if (!btbHit)
+                    {
+                        PC += 1;
+                    }
+
                     fetchQueue.push({instructionFETCH});
                     // FETCH
 
                     printStageInstruction("FETCH", instructionFETCH);
-                    PC += 1;
                 }
                 else
                 {
@@ -383,6 +430,16 @@ int main(int argc, char* argv[])
                 }
 
                 printStageInstruction("DECODE", instructionDECODE.instruction);
+
+                auto opcode = instructionDECODE.instruction.opcode;
+                if (opcode == config::Opcode::BP || opcode == config::Opcode::BNZ)
+                {
+                    btb.push(instructionDECODE.instruction.address, true, true, nullopt);
+                }
+                else if (opcode == config::Opcode::BZ || opcode == config::Opcode::BNP)
+                {
+                    btb.push(instructionDECODE.instruction.address, false, false, nullopt);
+                }
 
                 dRFQueue.push(instructionDECODE);
                 fetchQueue.pop();
@@ -461,7 +518,7 @@ int main(int argc, char* argv[])
 
                 if (opcode == config::Opcode::CML)
                 {
-                    resetAndUpdatePNZ(P, N, Z, literal);
+                    resetAndUpdatePNZ(P, N, Z, source1->get() - literal);
                     exQueue.push(instructionEXECUTE);
                 }
                 else if (opcode == config::Opcode::JUMP)
@@ -497,12 +554,118 @@ int main(int argc, char* argv[])
                      (opcode == config::Opcode::BN && N == 1) || (opcode == config::Opcode::BNN && N == 0) ||
                      (opcode == config::Opcode::BZ && Z == 1) || (opcode == config::Opcode::BNZ && Z == 0)))
                 {
-                    performCommonOperations(fetchQueue, dRFQueue, PC, instructionEXECUTE.instruction.address,
-                                            pcRelativeNumber);
+                    // performCommonOperations(fetchQueue, dRFQueue, PC, instructionEXECUTE.instruction.address,
+                    //                         pcRelativeNumber);
+                    // cout << "PC" << PC << "  "
+                    //      << pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber << endl;
+                    // cout << fetchQueue.front().instruction.address << "  "
+                    //      << pcToCodeMemoryIndex(fetchQueue.front().instruction.address) << endl;
+
+                    // If instruction coming behind is equal not equal to the branch target
+
+                    // cout << "=====  " << pcToCodeMemoryIndex(dRFQueue.back().instruction.address) << "  "
+                    //      << dRFQueue.back().instruction.rawInstruction << " oooooo"
+                    //      << "   fetch:" << fetchQueue.front().instruction.rawInstruction
+                    //      << pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber << endl;
+
+                    printQueues(fetchQueue, dRFQueue, exQueue, memQueue);
+                    cout << "FETCH QUEUE" << fetchQueue.front().instruction.rawInstruction << endl;
+                    cout << "Next instruction: " << dRFQueue.back().instruction.address << "  "
+                         << pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber << "jjjjj"
+                         << instructionMap[instructionEXECUTE.instruction.address + literal].rawInstruction << endl;
+
+                    if (dRFQueue.back().instruction.address != 0)
+                    {
+                        if (pcToCodeMemoryIndex(dRFQueue.back().instruction.address) !=
+                            pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber)
+                        {
+                            auto nop = createNOP();
+
+                            resetQueue(fetchQueue);
+                            resetQueue(dRFQueue);
+
+                            dRFQueue.push({nop, {}, {}});
+                            fetchQueue.push({nop, {}, {}});
+                            PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber;
+                            POP_DRF_QUEUE = false;
+                        }
+                    }
+                    else
+                    {
+                        if (pcToCodeMemoryIndex(fetchQueue.back().instruction.address) !=
+                            pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber)
+                        {
+                            auto nop = createNOP();
+
+                            resetQueue(fetchQueue);
+                            resetQueue(dRFQueue);
+
+                            dRFQueue.push({nop, {}, {}});
+                            fetchQueue.push({nop, {}, {}});
+                            PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber;
+                            POP_DRF_QUEUE = false;
+                        }
+                    }
+
+                    auto opcode = instructionEXECUTE.instruction.opcode;
+                    if (opcode == config::Opcode::BP || opcode == config::Opcode::BNZ)
+                    {
+                        btb.updateBTB(instructionEXECUTE.instruction.address, true,
+                                      instructionEXECUTE.instruction.address + literal);
+                    }
+                    else if (opcode == config::Opcode::BZ || opcode == config::Opcode::BNP)
+                    {
+                        btb.updateBTB(instructionEXECUTE.instruction.address, true,
+                                      instructionEXECUTE.instruction.address + literal);
+                    }
 
                     cout << "BRANCHING TO: " << instructionEXECUTE.instruction.address + literal << endl;
-                    POP_DRF_QUEUE = false;
                     STOP_FETCH = false;
+                }
+                else
+                {
+                    cout << "NOT BRANCHING" << endl;
+
+                    btb.updateBTB(instructionEXECUTE.instruction.address, false,
+                                  instructionEXECUTE.instruction.address + literal);
+
+                    if (dRFQueue.back().instruction.address != 0)
+                    {
+                        if (pcToCodeMemoryIndex(dRFQueue.back().instruction.address) ==
+                            pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber)
+                        {
+
+                            cout << instructionMap[instructionEXECUTE.instruction.address + literal].rawInstruction
+                                 << endl;
+                            cout << "NOT BRANCHING 1" << endl;
+                            auto nop = createNOP();
+
+                            resetQueue(fetchQueue);
+                            resetQueue(dRFQueue);
+
+                            dRFQueue.push({nop, {}, {}});
+                            fetchQueue.push({nop, {}, {}});
+                            PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + 1;
+                            POP_DRF_QUEUE = false;
+                        }
+                    }
+                    else
+                    {
+                        if (pcToCodeMemoryIndex(fetchQueue.back().instruction.address) ==
+                            pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + pcRelativeNumber)
+                        {
+                            cout << "NOT BRANCHING 2" << endl;
+                            auto nop = createNOP();
+
+                            resetQueue(fetchQueue);
+                            resetQueue(dRFQueue);
+
+                            dRFQueue.push({nop, {}, {}});
+                            fetchQueue.push({nop, {}, {}});
+                            PC = pcToCodeMemoryIndex(instructionEXECUTE.instruction.address) + 1;
+                            POP_DRF_QUEUE = false;
+                        }
+                    }
                 }
 
                 exQueue.push(instructionEXECUTE);
@@ -624,6 +787,8 @@ int main(int argc, char* argv[])
 
             for (auto& memUpdate : instructionMEMORY.memoryUpdates)
             {
+                cout << "--------" << endl;
+                cout << memUpdate.address << " value" << memUpdate.value << endl;
                 memory.write(memUpdate.address, memUpdate.value);
             }
 
@@ -650,6 +815,11 @@ int main(int argc, char* argv[])
                     regFile.setRegFromString(regUpdate.registerName, regUpdate.value);
             }
 
+            if (instructionWRITEBACK.instruction.opcode == config::Opcode::HALT)
+            {
+                HALT_REACHED = true;
+            }
+
             memQueue.pop();
         }
 
@@ -666,9 +836,22 @@ int main(int argc, char* argv[])
 
         cout << "P: " << P << " Z: " << Z << " N: " << N << endl;
 
+        // Result<uint8_t, Error> result = memory.read(64); // Store the result in a variable
+        // if (result.isOk())
+        // {
+        //     cout << "MEM READ: " << static_cast<int>(result.getValue()) << endl;
+        // }
+
+        btb.printBTB();
+
         CYCLE++;
 
         cin.get();
+
+        if (HALT_REACHED)
+        {
+            exit(0);
+        }
     }
 
     return 0;
