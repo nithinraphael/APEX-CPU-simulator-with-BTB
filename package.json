@@ -1,6 +1,6 @@
 {
   "name": "apex-sim",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "a collection of services and ui components to create products",
   "main": "index.js",
   "scripts": {
